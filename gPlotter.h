@@ -4,6 +4,203 @@
 
 using namespace std;
 
+vector<double> APNGSerializeHeaderChunks(PNGImage* png) {
+    double length, i, chunkLength;
+    NumberReference* position;
+
+    length = png->signature->size() + 12.0 + PNGHeaderLength() + 12.0 + PNGIDATLength(png) + 12.0 + 20.0 + 38.0;
+    if (png->physPresent) {
+        length = length + 4.0 + 4.0 + 1.0 + 12.0;
+    }
+    //data = new vector<double>(length);
+    vector<double> data(length);
+    position = CreateNumberReference(0.0);
+
+    /* PNG Signature */
+    cout << "PNG Signature" << endl;
+    for (i = 0.0; i < png->signature->size(); i = i + 1.0) {
+        WriteByte(&data, png->signature->at(i), position);
+    }
+
+    /* IHDR Header */
+    cout << "IHDR Header" << endl;
+    chunkLength = PNGHeaderLength();
+    Write4BytesBE(&data, chunkLength, position);
+    WriteStringBytes(&data, toVector(L"IHDR"), position);
+    Write4BytesBE(&data, png->ihdr->Width, position);
+    Write4BytesBE(&data, png->ihdr->Height, position);
+    WriteByte(&data, png->ihdr->BitDepth, position);
+    WriteByte(&data, png->ihdr->ColourType, position);
+    WriteByte(&data, png->ihdr->CompressionMethod, position);
+    WriteByte(&data, png->ihdr->FilterMethod, position);
+    WriteByte(&data, png->ihdr->InterlaceMethod, position);
+    Write4BytesBE(&data, CRC32OfInterval(&data, position->numberValue - chunkLength - 4.0, chunkLength + 4.0), position);
+
+    /* acTL */
+    cout << "acTL Header" << endl;
+    chunkLength = 8.0;
+    Write4BytesBE(&data, chunkLength, position);
+    WriteStringBytes(&data, toVector(L"acTL"), position);
+    Write4BytesBE(&data, 2.0, position); //Temp
+    Write4BytesBE(&data, 0.0, position);
+    Write4BytesBE(&data, CRC32OfInterval(&data, position->numberValue - chunkLength - 4.0, chunkLength + 4.0), position);
+
+    /* fcTL */
+    cout << "fcTL Header" << endl;
+    chunkLength = 26.0;
+    Write4BytesBE(&data, chunkLength, position);
+    WriteStringBytes(&data, toVector(L"fcTL"), position);
+    Write4BytesBE(&data, 0.0, position);
+    Write4BytesBE(&data, png->ihdr->Width, position);
+    Write4BytesBE(&data, png->ihdr->Height, position);
+    Write4BytesBE(&data, 0.0, position);
+    Write4BytesBE(&data, 0.0, position);
+    WriteByte(&data, 0.0, position);
+    WriteByte(&data, 1.0, position);
+    WriteByte(&data, 0.0, position);
+    WriteByte(&data, 1.0, position);
+    WriteByte(&data, 0.0, position);
+    WriteByte(&data, 0.0, position);
+    Write4BytesBE(&data, CRC32OfInterval(&data, position->numberValue - chunkLength - 4.0, chunkLength + 4.0), position);
+
+    /* pHYs */
+    if (png->physPresent) {
+        cout << "pHYs" << endl;
+        chunkLength = 4.0 + 4.0 + 1.0;
+        Write4BytesBE(&data, chunkLength, position);
+        WriteStringBytes(&data, toVector(L"pHYs"), position);
+
+        Write4BytesBE(&data, png->phys->pixelsPerMeter, position);
+        Write4BytesBE(&data, png->phys->pixelsPerMeter, position);
+        WriteByte(&data, 1.0, position);
+        /* 1 = pixels per meter */
+        Write4BytesBE(&data, CRC32OfInterval(&data, position->numberValue - chunkLength - 4.0, chunkLength + 4.0), position);
+    }
+
+    /* IDAT */
+    cout << "IDAT" << endl;
+    chunkLength = PNGIDATLength(png);
+    Write4BytesBE(&data, chunkLength, position);
+    WriteStringBytes(&data, toVector(L"IDAT"), position);
+    WriteByte(&data, png->zlibStruct->CMF, position);
+    WriteByte(&data, png->zlibStruct->FLG, position);
+    for (i = 0.0; i < png->zlibStruct->CompressedDataBlocks->size(); i = i + 1.0) {
+        WriteByte(&data, png->zlibStruct->CompressedDataBlocks->at(i), position);
+    }
+    Write4BytesBE(&data, png->zlibStruct->Adler32CheckValue, position);
+    Write4BytesBE(&data, CRC32OfInterval(&data, position->numberValue - chunkLength - 4.0, chunkLength + 4.0), position);
+   
+
+    return data;
+}
+
+vector<double> APNGSerializeFrameChunks(PNGImage* png) {
+    double length, i, chunkLength;
+    
+    NumberReference* position;
+
+    length = 38.0 + PNGIDATLength(png) + 16.0 + 12.0;
+    if (png->physPresent) {
+        length = length + 4.0 + 4.0 + 1.0 + 12.0;
+    }
+
+    vector<double> data(length);
+    //data = new vector<double>(length);
+    position = CreateNumberReference(0.0);
+
+    /* fcTL */
+    cout << "fcTL Header" << endl;
+    chunkLength = 26.0;
+    Write4BytesBE(&data, chunkLength, position);
+    WriteStringBytes(&data, toVector(L"fcTL"), position);
+    Write4BytesBE(&data, 1.0, position); //Temp pos
+    Write4BytesBE(&data, png->ihdr->Width, position);
+    Write4BytesBE(&data, png->ihdr->Height, position);
+    Write4BytesBE(&data, 0.0, position);
+    Write4BytesBE(&data, 0.0, position);
+    WriteByte(&data, 0.0, position);
+    WriteByte(&data, 1.0, position);
+    WriteByte(&data, 0.0, position);
+    WriteByte(&data, 1.0, position);
+    WriteByte(&data, 0.0, position);
+    WriteByte(&data, 0.0, position);
+    Write4BytesBE(&data, CRC32OfInterval(&data, position->numberValue - chunkLength - 4.0, chunkLength + 4.0), position);
+
+    /* pHYs */
+    if (png->physPresent) {
+        chunkLength = 4.0 + 4.0 + 1.0;
+        Write4BytesBE(&data, chunkLength, position);
+        WriteStringBytes(&data, toVector(L"pHYs"), position);
+
+        Write4BytesBE(&data, png->phys->pixelsPerMeter, position);
+        Write4BytesBE(&data, png->phys->pixelsPerMeter, position);
+        WriteByte(&data, 1.0, position);
+        /* 1 = pixels per meter */
+        Write4BytesBE(&data, CRC32OfInterval(&data, position->numberValue - chunkLength - 4.0, chunkLength + 4.0), position);
+    }
+
+    /* fdAT */
+    cout << "fdAT" << endl;
+    chunkLength = PNGIDATLength(png) + 4.0;
+    Write4BytesBE(&data, chunkLength, position);
+    WriteStringBytes(&data, toVector(L"fdAT"), position);
+    Write4BytesBE(&data, 1.0, position); //Temp
+    WriteByte(&data, png->zlibStruct->CMF, position);
+    WriteByte(&data, png->zlibStruct->FLG, position);
+    for (i = 0.0; i < png->zlibStruct->CompressedDataBlocks->size(); i = i + 1.0) {
+        WriteByte(&data, png->zlibStruct->CompressedDataBlocks->at(i), position);
+    }
+    Write4BytesBE(&data, png->zlibStruct->Adler32CheckValue, position);
+    Write4BytesBE(&data, CRC32OfInterval(&data, position->numberValue - chunkLength - 4.0, chunkLength + 4.0), position);
+
+    /* IEND */
+    cout << "IEND" << endl;
+    chunkLength = 0.0;
+    Write4BytesBE(&data, chunkLength, position);
+    WriteStringBytes(&data, toVector(L"IEND"), position);
+    Write4BytesBE(&data, CRC32OfInterval(&data, position->numberValue - 4.0, 4.0), position);
+
+    return data;
+}
+
+vector<double> ConvertToAPNGWithOptions(RGBABitmapImage* image, int frame, double colorType, bool setPhys, double pixelsPerMeter, double compressionLevel) {
+    PNGImage* png;
+    vector<double> pngData, * colorData;
+
+    png = new PNGImage();
+
+    png->signature = PNGSignature();
+
+    png->ihdr = PNGHeader(image, colorType);
+
+    png->physPresent = setPhys;
+    png->phys = PysicsHeader(pixelsPerMeter);
+
+    if (colorType == 6.0) {
+        colorData = GetPNGColorData(image);
+    }
+    else {
+        colorData = GetPNGColorDataGreyscale(image);
+    }
+    png->zlibStruct = ZLibCompressStaticHuffman(colorData, compressionLevel);
+
+    if (frame == 1)
+    {
+        pngData = APNGSerializeHeaderChunks(png);
+    }
+    if (frame > 1)
+    {
+        pngData = APNGSerializeFrameChunks(png);
+    }
+    return pngData;
+}
+
+vector<double> ConvertToAPNG(RGBABitmapImage* image, int frame)
+{
+    return ConvertToAPNGWithOptions(image, frame, 6.0, false, 0.0, 0.001);
+}
+
+
 template <class xGridOption>
 class gPlotter {
 protected:
@@ -16,6 +213,8 @@ protected:
 
     ScatterPlotSeries** series; //dyn alloc
     unsigned char series_SIZE;
+
+    double xMin, xMax, yMin, yMax;
 
     bool extendSeries(int new_size)
     {
@@ -110,11 +309,17 @@ public:
 
         series_SIZE = 0;
         drawLegendFlag = false;
+        success = false;
+
+        xMin = 0;
+        yMin = 0;
+        xMax = 0;
+        yMax = 0;
     }
     ~gPlotter() { FreeImage(); }
 
     bool DrawScatterPlotFromSettings() {
-        double xMin, xMax, yMin, yMax, xLength, yLength, i, x, y, xPrev, yPrev, px, py, pxPrev, pyPrev, originX, originY, p, l, plot;
+        double xLength, yLength, i, x, y, xPrev, yPrev, px, py, pxPrev, pyPrev, originX, originY, p, l, plot;
         Rectangle* boundaries;
         double xPadding, yPadding, originXPixels, originYPixels;
         double xPixelMin, yPixelMin, xPixelMax, yPixelMax, xLengthPixels, yLengthPixels, axisLabelPadding;
@@ -794,7 +999,6 @@ public:
             }
         }
 
-
         PNGName = PNGName + ".png";
         
         if (success) {
@@ -811,6 +1015,153 @@ public:
     }
     void FreeImage() {
         DeleteImage(canvasReference->image);
+        series_SIZE = 0;
     }
-    
+ 
 };
+
+class heatMapPlotter : public gPlotter<GridLabelsBasic> {
+protected:
+    vector<double>* xs;
+    vector<double>* ys;
+    vector<double>* values;
+    vector<double>* values2;
+    vector<string>* labels;
+    double value_min, value_max;
+    int in_size;
+    bool vec_flag;
+
+    vector<double> pngdata1;
+    vector<double> pngdata2;
+    int pngcount;
+public:
+    heatMapPlotter() {
+        settings->autoBoundaries = false;
+
+        settings->xMin = 0;
+        settings->yMin = 0;
+        settings->xMax = 10;
+        settings->yMax = 10;
+        value_min = 0;
+        value_max = 10;
+        in_size = 0;
+        xs = {};
+        ys = {};
+        values = {};
+        values2 = {};
+        vec_flag = false;
+
+        pngcount = 0;
+    }
+    void setLoc(vector<double>* x_loc, vector<double>* y_loc, vector<string>* labels_in,  int size, double x_max, double y_max)
+    {
+        settings->xMax = x_max;
+        settings->yMax = y_max;
+        xs = x_loc;
+        ys = y_loc;
+        in_size = size;
+        labels = labels_in;
+    }
+    void setVal(vector<double>* val, double val_min, double val_max)
+    {
+        values = val;
+        value_max = val_max;
+        value_min = val_min;
+    }
+    void setVecVal(vector<double>* valx, vector<double>* valy, double val_min, double val_max)
+    {
+        values = valx;
+        values2 = valy;
+        value_max = val_max;
+        value_min = val_min;
+        vec_flag = true;
+    }
+    void PrintArrows(double arrowLength)
+    {
+        //double la = 0.2;
+        double angle;
+        double xo, yo, xa, ya, xb, yb;
+        for (int i = 0; i < in_size; i++)
+        {
+            xo = 100 + xs->at(i) * 800 / (settings->xMax);
+            yo = 540 - ys->at(i) * 480 / (settings->yMax);
+            angle = tan(values2->at(i) / values->at(i));
+            xa = arrowLength * cos(angle);
+            ya = arrowLength * sin(angle);
+            xb = 0.5 * (xa * cos(3.14159265358979323846 / 4) - ya * sin(3.14159265358979323846 / 4));
+            yb = 0.5 * (xa * sin(3.14159265358979323846 / 4) + ya * cos(3.14159265358979323846 / 4));
+            //s = pow((pow(values->at(i), 2) + pow(values2->at(i), 2)) / pow(arrowLength, 2),0.5);
+            //xa = values->at(i) / s * 800 / (settings->xMax);
+            //ya = values2->at(i) / s * 480 / (settings->yMax);
+            DrawLine(canvasReference->image, xo, yo, xo + xa, yo + ya, 4, HeatMapColor((pow(pow(values->at(i),2)+ pow(values2->at(i), 2),0.5) - value_min) / (value_max - value_min)));
+            //s = 3.14159265358979323846 / 4 - atan(ya / xa);
+            //xb = (la * cos(s) * (xa / abs(xa))) * 800 / (settings->xMax);
+            //yb = (la * sin(s) * (xa / abs(xa))) * 480 / (settings->yMax);
+            DrawLine(canvasReference->image, xo + xa, yo + ya, xo + xa - xb, yo + ya + yb, 4, HeatMapColor((pow(pow(values->at(i), 2) + pow(values2->at(i), 2), 0.5) - value_min) / (value_max - value_min)));
+            DrawLine(canvasReference->image, xo + xa, yo + ya, xo + xa - yb, yo + ya - xb, 4, HeatMapColor((pow(pow(values->at(i), 2) + pow(values2->at(i), 2), 0.5) - value_min) / (value_max - value_min)));
+        }
+        
+    }
+    void PrintPlot(string PNGName) {
+        success = DrawScatterPlotFromSettings();
+        pngcount++;
+        if (success) {
+
+            DrawTextPB(canvasReference->image, 910, 440, stringToWVector(to_string((int)value_min)), CreateRGBColor(0, 0, 0));
+            DrawFilledRectangle(canvasReference->image, 910, 400, 50, 25, CreateRGBColor(0, 0, 1));
+            DrawFilledRectangle(canvasReference->image, 910, 375, 50, 25, CreateRGBColor(0.25, 0, 1));
+            DrawFilledRectangle(canvasReference->image, 910, 350, 50, 25, CreateRGBColor(0.50, 0, 1));
+            DrawFilledRectangle(canvasReference->image, 910, 325, 50, 25, CreateRGBColor(0.75, 0, 1));
+            DrawFilledRectangle(canvasReference->image, 910, 300, 50, 25, CreateRGBColor(1, 0, 1));
+            DrawFilledRectangle(canvasReference->image, 910, 275, 50, 25, CreateRGBColor(1, 0, 0.75));
+            DrawFilledRectangle(canvasReference->image, 910, 250, 50, 25, CreateRGBColor(1, 0, 0.50));
+            DrawFilledRectangle(canvasReference->image, 910, 225, 50, 25, CreateRGBColor(1, 0, 0.25));
+            DrawFilledRectangle(canvasReference->image, 910, 200, 50, 25, CreateRGBColor(1, 0, 0));
+            DrawTextPB(canvasReference->image, 910, 185, stringToWVector(to_string((int)value_max)), CreateRGBColor(0, 0, 0));
+            
+            
+            if (!vec_flag)
+            {
+                for (int i = 0; i < in_size; i++)
+                {
+                    DrawFilledCircle(canvasReference->image, 100 + xs->at(i) * 800 / (settings->xMax), 540 - ys->at(i) * 480 / (settings->yMax), 12, HeatMapColor((values->at(i) - value_min) / (value_max - value_min)));
+                    //DrawTextPB(canvasReference->image, 100 + xs->at(i) * 800 / (settings->xMax), 540 - ys->at(i) * 480 / (settings->yMax), stringToWVector(labels->at(i)), CreateRGBColor(0, 0, 0));
+                }
+            }
+            if (vec_flag)
+                PrintArrows(0.35); //input?
+        }
+
+        PNGName = PNGName + ".png";
+
+        if (success) {
+            vector<double>* pngdata = ConvertToPNG(canvasReference->image);
+            WriteToFile(pngdata, PNGName);
+            //if (pngcount == 1)
+            //    pngdata1 = ConvertToAPNG(canvasReference->image, pngcount);
+            //if (pngcount > 1)
+            //{
+            //    pngdata2 = ConvertToAPNG(canvasReference->image, pngcount);
+            //    pngdata1.insert(pngdata1.end(), pngdata2.begin(), pngdata2.end());
+            //    WriteToFile(&pngdata1, PNGName);
+            //}
+
+        }
+        else {
+            cerr << "Error: ";
+            for (wchar_t c : *errorMessage->string) {
+                wcerr << c;
+            }
+            cerr << endl;
+        }
+    }
+    RGBA* HeatMapColor(double i)
+    {
+        if(i <= 0.5)
+            return CreateRGBColor(i*2, 0, 1);
+        if(i > 0.5)
+            return CreateRGBColor(1, 0, 2 - i*2); //check
+    }
+};
+
+
